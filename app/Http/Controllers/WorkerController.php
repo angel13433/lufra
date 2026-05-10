@@ -17,7 +17,12 @@ class WorkerController extends Controller
             return response()->json(['error' => 'No hay un trabajador vinculado a este usuario.'], 404);
         }
 
-        $trabajador = Trabajador::find($user->Id_Trabajador);
+        $trabajador = DB::table('trabajador as w')
+            ->leftJoin('cargo as c', 'w.Id_Cargo', '=', 'c.Id_Cargo')
+            ->select('w.*', 'c.Nombre_profesión as Cargo')
+            ->where('w.Id_Trabajador', $user->Id_Trabajador)
+            ->first();
+
         if (!$trabajador) {
             return response()->json(['error' => 'No se encontró la información del trabajador.'], 404);
         }

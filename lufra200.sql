@@ -330,7 +330,9 @@ CREATE TABLE `nivel_educativo` (
 
 INSERT INTO `nivel_educativo` (`Id_Nivel_Educativo`, `Nombre_Nivel`) VALUES
 (1, 'Primaria'),
-(2, 'Secundaria');
+(2, 'Secundaria'),
+(3, 'Superior'),
+(4, 'Nulo');
 
 -- --------------------------------------------------------
 

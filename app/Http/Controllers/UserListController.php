@@ -23,6 +23,10 @@ class UserListController extends Controller
             $query->where('role', $request->rol);
         }
 
+        if ($request->filled('estado')) {
+            $query->where('Estado', $request->estado);
+        }
+
         $users = $query->get();
 
         if ($request->ajax() || $request->wantsJson()) {

@@ -41,6 +41,10 @@ function formatLocalDate(dateString) {
     const date = new Date(year, month, day);
     try { return date.toLocaleDateString('es-VE'); } catch (e) { return date.toLocaleDateString(); }
 }
+
+const VACATION_MODAL_SESSION_KEY = 'vacationModalShownThisSession';
+const VACATION_MODULE_VISITED_KEY = 'vacationModuleVisitedThisSession';
+
 const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1.5 12s4-7 10.5-7S22.5 12 22.5 12s-4 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const eyeOffSvg = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.47 10.47A3 3 0 0113.53 13.53" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.21 12.7C3.67 15.55 7.17 18 12 18c6.5 0 10.5-6 10.5-6s-1.99-2.55-4.58-4.19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -181,7 +185,23 @@ function initPayrollPage() {
             const link = document.createElement('a');
             link.href = "#";
             link.className = "nav-link";
+            link.dataset.moduleName = moduleName;
             link.textContent = moduleName;
+
+            // Agregar indicador de notificación para "Solicitud de Vacaciones" si ha pasado un año
+            if (roleName === 'Trabajador' && moduleName === 'Solicitud de Vacaciones') {
+                link.innerHTML = `${moduleName} <span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #ffffff; background:#ffffff; color:#ff6b6b; font-weight:800; margin-left:8px; font-size:0.78rem;">!</span>`;
+                // Verificar async y quitar si no cumple
+                checkVacationEligibility().then(canRequest => {
+                    if (!canRequest) {
+                        link.textContent = moduleName;
+                    }
+                }).catch(err => {
+                    console.error('Error checking vacation eligibility:', err);
+                    link.textContent = moduleName; // Quitar en caso de error
+                });
+            }
+
             if (index === 0) link.classList.add('active');
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -223,6 +243,10 @@ function initPayrollPage() {
     let currentRole = 'Administrativo';
 
     function renderModule(moduleName) {
+        if (currentRole === 'Trabajador' && moduleName === 'Solicitud de Vacaciones') {
+            sessionStorage.setItem(VACATION_MODULE_VISITED_KEY, 'true');
+            updateVacationBadge();
+        }
         const role = currentRole;
         if (contentHeader) contentHeader.innerHTML = `<h4>${role} - ${moduleName}</h4>`;
 
@@ -241,6 +265,72 @@ function initPayrollPage() {
     // Empleados ahora se gestionan en backend (settings.php key: payroll_employees)
     function getEmployees() { return []; }
     function saveEmployees(list) { /* use settings.php via UI */ }
+
+    async function updateVacationBadge() {
+        const sidebarNav = document.getElementById('module-navigation');
+        if (!sidebarNav) return;
+        const link = sidebarNav.querySelector('.nav-link[data-module-name="Solicitud de Vacaciones"]');
+        if (!link) return;
+
+        const canRequest = await checkVacationEligibility();
+        if (canRequest) {
+            link.innerHTML = `Solicitud de Vacaciones <span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #ffffff; background:#ffffff; color:#ff6b6b; font-weight:800; margin-left:8px; font-size:0.78rem;">!</span>`;
+        } else {
+            link.textContent = 'Solicitud de Vacaciones';
+        }
+    }
+    window.updateVacationBadge = updateVacationBadge;
+
+    // Función para verificar si el trabajador puede solicitar vacaciones (ha pasado un año desde ingreso)
+    async function checkVacationEligibility() {
+        console.log('Checking vacation eligibility...');
+        try {
+            const response = await fetch('/trabajador/vacations-data', {
+                headers: { 'Accept': 'application/json' }
+            });
+            console.log('Fetch response ok:', response.ok);
+            const data = await response.json();
+            console.log('Data received:', data);
+
+            if (!response.ok || !data.fechaIngreso) {
+                console.log('Response not ok or no fechaIngreso');
+                return false;
+            }
+
+            // Reiniciar estado si la fecha de ingreso cambió en el servidor
+            const lastDate = localStorage.getItem('vacationLastSeenHireDate');
+            if (lastDate && lastDate !== data.fechaIngreso) {
+                localStorage.removeItem('vacationNoticeDismissed');
+                localStorage.removeItem('vacationRequestSent');
+            }
+            localStorage.setItem('vacationLastSeenHireDate', data.fechaIngreso);
+
+            // Reset alreadySubmitted if last request was rejected
+            if (data.lastRequest && data.lastRequest.Estado === 'Rechazada') {
+                localStorage.removeItem('vacationRequestSent');
+            }
+
+            const hireDate = new Date(data.fechaIngreso);
+            const today = new Date();
+            const oneYearAgo = new Date(today);
+            oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+            const isOneYearOld = hireDate <= oneYearAgo;
+            const hasPendingOrApproved = data.lastRequest && ['Pendiente', 'Aceptada'].includes(data.lastRequest.Estado);
+            const alreadySubmitted = localStorage.getItem('vacationRequestSent') === 'true';
+            const isDismissed = localStorage.getItem('vacationNoticeDismissed') === 'true';
+            const moduleVisited = sessionStorage.getItem(VACATION_MODULE_VISITED_KEY) === 'true';
+
+            console.log('isOneYearOld:', isOneYearOld, 'hasPendingOrApproved:', hasPendingOrApproved, 'alreadySubmitted:', alreadySubmitted, 'isDismissed:', isDismissed, 'moduleVisited:', moduleVisited);
+
+            const eligible = isOneYearOld && !hasPendingOrApproved && !alreadySubmitted && !isDismissed && !moduleVisited;
+            console.log('Eligible:', eligible);
+            return eligible;
+        } catch (error) {
+            console.error('Error checking vacation eligibility:', error);
+            return false;
+        }
+    }
 
     // --- Settings Hub: Floating Gear Instantiation ---
     initSettingsHub();
@@ -4127,6 +4217,7 @@ function initPayrollPage() {
             function renderReportView(filteredUsers, filters = {}) {
                 const searchVal = filters.q || '';
                 const roleVal = filters.rol || '';
+                const statusVal = filters.estado || '';
                 const savedColor = localStorage.getItem('primaryColor') || 'charcoal';
 
                 let html = `
@@ -4174,6 +4265,11 @@ function initPayrollPage() {
                                 <option value="SuperUsuario" ${roleVal === 'SuperUsuario' ? 'selected' : ''}>SuperUsuario</option>
                                 <option value="Administrativo" ${roleVal === 'Administrativo' ? 'selected' : ''}>Administrativo</option>
                                 <option value="Trabajador" ${roleVal === 'Trabajador' ? 'selected' : ''}>Trabajador</option>
+                            </select>
+                            <select id="rep-status" style="padding:8px; border-radius:5px; border:1px solid var(--border-color); background:var(--bg-color); color:var(--text-main);">
+                                <option value="">Todos los estados</option>
+                                <option value="Activo" ${statusVal === 'Activo' ? 'selected' : ''}>Activo</option>
+                                <option value="Inactivo" ${statusVal === 'Inactivo' ? 'selected' : ''}>Inactivo</option>
                             </select>
                             <button id="rep-filter-btn" style="background:var(--primary); color:white; padding:8px 18px; border-radius:6px; border:none; cursor:pointer;">Filtrar</button>
                         </div>
@@ -4243,14 +4339,16 @@ function initPayrollPage() {
                 document.getElementById('rep-filter-btn').addEventListener('click', () => {
                     const q = document.getElementById('rep-search').value.toLowerCase();
                     const r = document.getElementById('rep-role').value;
+                    const s = document.getElementById('rep-status').value;
 
                     const filtered = users.filter(user => {
                         const matchesSearch = (user.Nombre_usuario || '').toLowerCase().includes(q);
                         const matchesRole = r ? (user.Nombre_rol === r) : true;
-                        return matchesSearch && matchesRole;
+                        const matchesStatus = s ? (user.Estado === s) : true;
+                        return matchesSearch && matchesRole && matchesStatus;
                     });
 
-                    renderReportView(filtered, { q, rol: r });
+                    renderReportView(filtered, { q, rol: r, estado: s });
                 });
 
                 // Allow enter key in search
@@ -4261,7 +4359,8 @@ function initPayrollPage() {
                 document.getElementById('rep-print-btn').addEventListener('click', () => {
                     const q = document.getElementById('rep-search').value;
                     const rol = document.getElementById('rep-role').value;
-                    window.open(`/superusuario/admin/users?print=true&q=${encodeURIComponent(q)}&rol=${encodeURIComponent(rol)}`, '_blank');
+                    const estado = document.getElementById('rep-status').value;
+                    window.open(`/superusuario/admin/users?print=true&q=${encodeURIComponent(q)}&rol=${encodeURIComponent(rol)}&estado=${encodeURIComponent(estado)}`, '_blank');
                 });
             }
 
@@ -4289,7 +4388,67 @@ function initPayrollPage() {
     }
 }
 
+// Función para mostrar modal de vacaciones al iniciar sesión
+async function showVacationModal() {
+    try {
+        const response = await fetch('/trabajador/vacations-data', {
+            headers: { 'Accept': 'application/json' }
+        });
+        const data = await response.json();
 
+        if (!response.ok || !data.fechaIngreso) return;
+
+        // Reiniciar estado si la fecha de ingreso cambió (Login Global)
+        const lastDate = localStorage.getItem('vacationLastSeenHireDate');
+        if (lastDate && lastDate !== data.fechaIngreso) {
+            localStorage.removeItem('vacationNoticeDismissed');
+            localStorage.removeItem('vacationRequestSent');
+        }
+        localStorage.setItem('vacationLastSeenHireDate', data.fechaIngreso);
+
+        // Reset alreadySubmitted if last request was rejected
+        if (data.lastRequest && data.lastRequest.Estado === 'Rechazada') {
+            localStorage.removeItem('vacationRequestSent');
+        }
+
+        const hireDate = new Date(data.fechaIngreso);
+        const today = new Date();
+        const oneYearAgo = new Date(today);
+        oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+        const isOneYearOld = hireDate <= oneYearAgo;
+        const hasPendingOrApproved = data.lastRequest && ['Pendiente', 'Aceptada'].includes(data.lastRequest.Estado);
+        const alreadySubmitted = localStorage.getItem('vacationRequestSent') === 'true';
+        const isDismissed = localStorage.getItem('vacationNoticeDismissed') === 'true';
+
+        if (isOneYearOld && !hasPendingOrApproved && !alreadySubmitted && !isDismissed) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;';
+            modal.innerHTML = `
+                <div class="modal-content" style="background: var(--bg-color); color: var(--text-main); padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                    <h3 style="margin-top: 0; color: var(--text-main);">¡Atención!</h3>
+                    <p>Ya ha pasado 1 año desde tu fecha de ingreso. Puedes realizar una solicitud de vacaciones.</p>
+                    <label style="display: block; margin: 10px 0;">
+                        <input type="checkbox" id="dismiss-checkbox" style="margin-right: 8px;"> No mostrar de nuevo
+                    </label>
+                    <button id="accept-btn" class="primary" style="width: 100%; padding: 10px; margin-top: 15px;">Aceptar</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('accept-btn').addEventListener('click', () => {
+                const checked = document.getElementById('dismiss-checkbox').checked;
+                if (checked) {
+                    localStorage.setItem('vacationNoticeDismissed', 'true');
+                }
+                modal.remove();
+            });
+        }
+    } catch (error) {
+        console.error('Error showing vacation modal:', error);
+    }
+}
 
 function initLoginPage() {
     // Corregir enlace de estilos si es necesario (login.html may use styles.css)
@@ -4350,6 +4509,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         // inicializar interfaz administrativa
         initPayrollPage();
+
+        // Solo una llamada al modal al cargar la página
+        if (auth && auth.role === 'Trabajador') {
+            showVacationModal();
+        }
     }
 });
 

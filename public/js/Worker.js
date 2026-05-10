@@ -72,7 +72,7 @@ async function renderProfile() {
                                 </div>
                                 <div>
                                     <label style="display: block; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;">Fecha de Ingreso</label>
-                                    <div style="font-size: 1.1rem; color: var(--text-main); font-weight: 600;">${data.Fecha_de_Ingreso}</div>
+                                    <div style="font-size: 1.1rem; color: var(--text-main); font-weight: 600;">${formatLocalDate(data.Fecha_de_Ingreso)}</div>
                                 </div>
                             </div>
                             <div class="info-item" style="grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 15px;">
@@ -85,9 +85,17 @@ async function renderProfile() {
                                     <div style="font-size: 1.1rem; color: var(--text-main); font-weight: 600; word-break: break-word;">${data.Direccion || 'N/A'}</div>
                                 </div>
                             </div>
-                            <div class="info-item" style="grid-column: 3; grid-row: 1; grid-column-end: span 2;">
-                                <label style="display: block; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;">Teléfono</label>
-                                <div style="font-size: 1.1rem; color: var(--text-main); font-weight: 600;">${data.Telefono_Movil || 'N/A'}</div>
+                            <div class="info-item" style="grid-column: 3; grid-row: 1; grid-column-end: span 2; display: flex; flex-direction: column; gap: 15px;">
+                                <div>
+                                    <label style="display: block; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;">Cargo Asignado</label>
+                                    <div style="font-size: 1.1rem; color: var(--text-main); font-weight: 600;">
+                                        ${data.Cargo || data.Nombre_profesión || (data.cargo && (data.cargo.Nombre_profesión || data.cargo.Nombre)) || 'No asignado'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;">Teléfono</label>
+                                    <div style="font-size: 1.1rem; color: var(--text-main); font-weight: 600;">${data.Telefono_Movil || 'N/A'}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -109,6 +117,7 @@ async function renderProfile() {
  * Renders the Vacation Request module
  */
 async function renderVacations() {
+    console.log('renderVacations called');
     const container = document.getElementById('content-details');
     container.innerHTML = '<div class="loader-container"><p>Verificando estatus de vacaciones...</p></div>';
 
@@ -120,6 +129,19 @@ async function renderVacations() {
 
         if (!response.ok) throw new Error(data.error || 'Error al obtener datos de vacaciones');
 
+        // Detectar cambio de fecha de ingreso para reiniciar el aviso si es necesario
+        const lastDate = localStorage.getItem('vacationLastSeenHireDate');
+        if (lastDate && lastDate !== data.fechaIngreso) {
+            localStorage.removeItem('vacationNoticeDismissed');
+            localStorage.removeItem('vacationRequestSent');
+        }
+        localStorage.setItem('vacationLastSeenHireDate', data.fechaIngreso);
+
+        // Reset alreadySubmitted if last request was rejected
+        if (data.lastRequest && data.lastRequest.Estado === 'Rechazada') {
+            localStorage.removeItem('vacationRequestSent');
+        }
+
         let statusHtml = '';
         let formHtml = '';
 
@@ -127,19 +149,24 @@ async function renderVacations() {
         const ingreso = new Date(data.fechaIngreso);
         const now = new Date();
         const years = (now - ingreso) / (1000 * 60 * 60 * 24 * 365.25);
+        const noActiveRequest = !data.lastRequest || !['Pendiente', 'Aceptada'].includes(data.lastRequest.Estado);
+        const alreadySubmitted = localStorage.getItem('vacationRequestSent') === 'true';
+        const isDismissed = localStorage.getItem('vacationNoticeDismissed') === 'true';
+
+        console.log('Render vacations - years:', years, 'noActiveRequest:', noActiveRequest, 'alreadySubmitted:', alreadySubmitted, 'isDismissed:', isDismissed);
 
         if (years < 1) {
             statusHtml = `
                 <div class="alert info">
                     <h5>Aviso de Antigüedad</h5>
-                    <p>Podrás solicitar vacaciones después de cumplir tu primer año (Fecha ingreso: ${data.fechaIngreso}).</p>
+                    <p>Podrás solicitar vacaciones después de cumplir tu primer año (Fecha ingreso: ${formatLocalDate(data.fechaIngreso)}).</p>
                 </div>
             `;
         } else if (data.lastRequest && data.lastRequest.Estado === 'Pendiente') {
             statusHtml = `
                 <div class="alert warn fade-in">
                     <h5 style="margin-top:0;">Solicitud en Trámite</h5>
-                    <p>Ya tienes una solicitud pendiente para el <strong>${data.lastRequest.Fecha_Inicio_Vacaciones}</strong>. Por favor espera la respuesta del administrador.</p>
+                    <p>Ya tienes una solicitud pendiente para el <strong>${formatLocalDate(data.lastRequest.Fecha_Inicio_Vacaciones)}</strong>. Por favor espera la respuesta del administrador.</p>
                 </div>
             `;
         } else if (data.lastRequest && data.lastRequest.Estado === 'Aceptada') {
@@ -150,12 +177,21 @@ async function renderVacations() {
                 </div>
             `;
         } else if (data.lastRequest && data.lastRequest.Estado === 'Rechazada') {
-            const motivo = data.lastRequest.motivo_rechazo ? `<p><strong>Motivo del rechazo:</strong> ${data.lastRequest.motivo_rechazo}</p>` : '';
+            const motivoText = data.lastRequest.motivo_rechazo;
             statusHtml = `
-                <div class="alert error fade-in">
+                <div class="alert error fade-in" style="border-color:#f87171; background: rgba(254, 202, 202, 0.25); color: #991b1b;">
                     <h5 style="margin-top:0;">Solicitud Rechazada</h5>
-                    <p>Tu solicitud de vacaciones ha sido rechazada.</p>
-                    ${motivo}
+                    <p>Tus vacaciones han sido rechazadas.</p>
+                    ${motivoText ? `
+                        <div style="margin: 10px 0;">
+                            <span id="toggle-rejection-reason" style="cursor:pointer; text-decoration:underline; font-weight:600; font-size:0.9em; display:inline-block; margin-bottom: 5px;">
+                                Ver motivo del rechazo
+                            </span>
+                            <div id="rejection-reason-content" style="display:none; margin-top:5px; padding:10px; background:rgba(255,255,255,0.3); border-radius:6px; border-left:4px solid #f87171; font-size: 0.95em;">
+                                <strong>Motivo:</strong> ${motivoText}
+                            </div>
+                        </div>
+                    ` : ''}
                     <p>Puedes enviar una nueva solicitud.</p>
                 </div>
             `;
@@ -203,6 +239,21 @@ async function renderVacations() {
             document.getElementById('btn-submit-vac').addEventListener('click', submitVacationRequest);
         }
 
+        // Event listener para mostrar/ocultar el motivo del rechazo
+        const toggleBtn = document.getElementById('toggle-rejection-reason');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                const content = document.getElementById('rejection-reason-content');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    this.textContent = 'Ocultar motivo del rechazo';
+                } else {
+                    content.style.display = 'none';
+                    this.textContent = 'Ver motivo del rechazo';
+                }
+            });
+        }
+
     } catch (error) {
         container.innerHTML = `<div class="alert error"><p>${error.message}</p></div>`;
     }
@@ -231,6 +282,11 @@ async function submitVacationRequest() {
         const result = await response.json();
 
         if (response.ok) {
+            localStorage.setItem('vacationRequestSent', 'true');
+            localStorage.removeItem('vacationNoticeSeen');
+            if (typeof window.updateVacationBadge === 'function') {
+                window.updateVacationBadge();
+            }
             showSuccess('¡Solicitud enviada exitosamente!');
             renderVacations();
         } else {
@@ -298,7 +354,7 @@ async function renderPayslipHistory() {
                             <tbody>
                                 ${data.map(p => `
                                     <tr style="border-bottom: 1px solid var(--border-color);">
-                                        <td style="padding: 12px; border: 1px solid var(--border-color); color: var(--text-main);">${p.fechaPago}</td>
+                                        <td style="padding: 12px; border: 1px solid var(--border-color); color: var(--text-main);">${formatLocalDate(p.fechaPago)}</td>
                                         <td style="padding: 12px; border: 1px solid var(--border-color); color: var(--text-main);">${p.periodo}</td>
                                         <td style="padding: 12px; border: 1px solid var(--border-color); font-weight: bold; color: var(--text-main);">Bs. ${p.neto}</td>
                                         <td style="padding: 12px; border: 1px solid var(--border-color);" class="center">
@@ -333,7 +389,7 @@ async function renderPayslipHistory() {
             noResultsMsg.style.display = 'none';
             tableBody.innerHTML = list.map(p => `
                 <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px; border: 1px solid var(--border-color); color: var(--text-main);">${p.fechaPago}</td>
+                    <td style="padding: 12px; border: 1px solid var(--border-color); color: var(--text-main);">${formatLocalDate(p.fechaPago)}</td>
                     <td style="padding: 12px; border: 1px solid var(--border-color); color: var(--text-main);">${p.periodo}</td>
                     <td style="padding: 12px; border: 1px solid var(--border-color); font-weight: bold; color: var(--text-main);">Bs. ${p.neto}</td>
                     <td style="padding: 12px; border: 1px solid var(--border-color);" class="center">

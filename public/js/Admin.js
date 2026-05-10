@@ -342,6 +342,8 @@
         const cancelBtn = document.getElementById('cancel-worker-btn');
         const form = document.getElementById('worker-form');
 
+        let oldFechaIngreso = null;
+
         // Input restrictions and error displays
         form.querySelectorAll('.only-numbers').forEach(input => {
             input.addEventListener('keypress', (e) => {
@@ -570,40 +572,52 @@
                 const id = btn.dataset.id;
                 const w = workers.find(x => String(x.Id_Trabajador) === String(id));
                 if (w) {
-                    document.getElementById('w-id-trabajador').value = w.Id_Trabajador;
-                    document.getElementById('w-nombres').value = w.Nombre_Completo;
-                    document.getElementById('w-apellidos').value = w.Apellidos;
+                    const setFieldValue = (fieldId, value) => {
+                        const field = document.getElementById(fieldId);
+                        if (!field) return;
+                        field.value = value ?? '';
+                    };
+
+                    document.getElementById('w-id-trabajador').value = w.Id_Trabajador ?? '';
+                    setFieldValue('w-nombres', w.Nombre_Completo);
+                    setFieldValue('w-apellidos', w.Apellidos);
 
                     // Parse CI
-                    const ciParts = w.Documento_Identidad.split('-');
+                    const ciParts = (w.Documento_Identidad || '').split('-');
                     if (ciParts.length === 2) {
-                        document.getElementById('w-cedula-prefix').value = ciParts[0] + '-';
-                        document.getElementById('w-cedula-num').value = ciParts[1];
+                        setFieldValue('w-cedula-prefix', ciParts[0] + '-');
+                        setFieldValue('w-cedula-num', ciParts[1]);
                     } else {
-                        document.getElementById('w-cedula-num').value = w.Documento_Identidad;
+                        setFieldValue('w-cedula-prefix', '');
+                        setFieldValue('w-cedula-num', w.Documento_Identidad || '');
                     }
 
-                    document.getElementById('w-fecha-nac').value = w.Fecha_Nacimiento;
-                    document.getElementById('w-genero').value = w.Genero;
-                    document.getElementById('w-estado-civil').value = w.Estado_Civil;
-                    document.getElementById('w-correo').value = w.Correo || '';
+                    setFieldValue('w-fecha-nac', w.Fecha_Nacimiento);
+                    setFieldValue('w-genero', w.Genero);
+                    setFieldValue('w-estado-civil', w.Estado_Civil);
+                    setFieldValue('w-correo', w.Correo);
 
-                    // Parse Tel
-                    if (w.Telefono_Movil && w.Telefono_Movil.includes('-')) {
-                        const tParts = w.Telefono_Movil.split('-');
-                        document.getElementById('w-telef-prefix').value = tParts[0];
-                        document.getElementById('w-telef-num').value = tParts[1];
+                    if (w.Telefono_Movil) {
+                        if (w.Telefono_Movil.includes('-')) {
+                            const tParts = w.Telefono_Movil.split('-');
+                            setFieldValue('w-telef-prefix', tParts[0]);
+                            setFieldValue('w-telef-num', tParts[1]);
+                        } else {
+                            setFieldValue('w-telef-prefix', '');
+                            setFieldValue('w-telef-num', w.Telefono_Movil);
+                        }
                     } else {
-                        document.getElementById('w-telef-num').value = w.Telefono_Movil || '';
+                        setFieldValue('w-telef-prefix', '');
+                        setFieldValue('w-telef-num', '');
                     }
 
-                    document.getElementById('w-direccion').value = w.Direccion || '';
-                    document.getElementById('w-cargo').value = w.Id_Cargo;
-                    document.getElementById('w-nivel').value = w.Id_Nivel_Educativo;
-                    document.getElementById('w-tipo-nomina').value = w.Id_Tipo_Nomina;
-                    document.getElementById('w-fecha-ingreso').value = w.Fecha_de_Ingreso;
-                    document.getElementById('w-estado').value = w.Contrato_Estado;
-                    document.getElementById('w-observaciones').value = w.Observaciones || '';
+                    setFieldValue('w-direccion', w.Direccion);
+                    setFieldValue('w-cargo', w.Id_Cargo);
+                    setFieldValue('w-nivel', w.Id_Nivel_Educativo);
+                    setFieldValue('w-tipo-nomina', w.Id_Tipo_Nomina);
+                    setFieldValue('w-fecha-ingreso', w.Fecha_de_Ingreso);
+                    setFieldValue('w-estado', w.Contrato_Estado);
+                    setFieldValue('w-observaciones', w.Observaciones);
 
                     document.getElementById('worker-form-title').textContent = 'Editar Trabajador';
                     formContainer.style.display = 'block';
@@ -716,9 +730,9 @@
                     <tbody>
                         ${requests.map(r => `
                             <tr style="border-bottom: 1px solid var(--border-color);">
-                                <td style="padding: 10px; border: 1px solid var(--border-color); color: var(--text-main);">${new Date(r.Fecha_Solicitud).toLocaleDateString()}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color); color: var(--text-main);">${formatLocalDate(r.Fecha_Solicitud)}</td>
                                 <td style="padding: 10px; border: 1px solid var(--border-color); font-weight: 600; color: var(--text-main);">${r.Nombre_Completo} ${r.Apellidos}</td>
-                                <td style="padding: 10px; border: 1px solid var(--border-color); color: var(--text-main);">${new Date(r.Fecha_Inicio_Vacaciones).toLocaleDateString()}</td>
+                                <td style="padding: 10px; border: 1px solid var(--border-color); color: var(--text-main);">${formatLocalDate(r.Fecha_Inicio_Vacaciones)}</td>
                                 <td style="padding: 10px; border: 1px solid var(--border-color);">
                                     <span style="padding: 6px 14px; border-radius: 20px; font-size: 0.8em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
                                         color: white; background-color: ${r.Estado === 'Aceptada' ? 'var(--success-color)' : r.Estado === 'Rechazada' ? 'var(--error-color)' : 'var(--text-muted)'};">
@@ -935,12 +949,25 @@
                         <h4 style="margin-top: 0; color: var(--text-main); border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Procesar Pago de Nómina</h4>
                         
                         <div class="payroll-form" style="background: var(--card-bg); padding:25px; border-radius:12px; border: 1px solid var(--border-color); box-shadow:0 10px 30px rgba(0,0,0,0.1);">
-                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:25px; margin-bottom:30px;">
+                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:25px; margin-bottom:30px;">
                                 <div class="form-row">
                                     <label style="display:block; font-weight:600; margin-bottom:8px; color: var(--text-main);">Seleccionar Trabajador</label>
                                     <select id="p-worker" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
                                         <option value="">Seleccione trabajador...</option>
                                         ${workers.map(w => `<option value="${w.Id_Trabajador}">${w.Documento_Identidad} - ${w.Nombre_Completo} ${w.Apellidos}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label style="display:block; font-weight:600; margin-bottom:8px; color: var(--text-main);">Año de Nómina</label>
+                                    <select id="p-year" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                                        ${(() => {
+                                            const currentYear = new Date().getFullYear();
+                                            let opts = "";
+                                            for(let y = currentYear - 5; y <= currentYear + 5; y++) {
+                                                opts += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+                                            }
+                                            return opts;
+                                        })()}
                                     </select>
                                 </div>
                                 <div class="form-row">
@@ -1036,6 +1063,7 @@
         const addBtn = document.getElementById('btn-add-concept-to-list');
         const conceptSelect = document.getElementById('p-add-concept');
         const salaryInput = document.getElementById('p-salario');
+        const yearSelect = document.getElementById('p-year');
         const periodSelect = document.getElementById('p-periodo');
         const dateFromInput = document.getElementById('p-fecha-desde');
         const dateToInput = document.getElementById('p-fecha-hasta');
@@ -1043,7 +1071,7 @@
         const generateBtn = document.getElementById('btn-generate-pay');
 
         // Lógica de Periodos Automáticos
-        periodSelect.addEventListener('change', () => {
+        const updatePeriodDates = () => {
             const v = periodSelect.value;
             if (!v) {
                 dateFromInput.value = '';
@@ -1051,7 +1079,7 @@
                 return;
             }
 
-            const currentYear = new Date().getFullYear();
+            const year = parseInt(yearSelect.value) || new Date().getFullYear();
             const monthsMap = {
                 "Enero": 0, "Febrero": 1, "Marzo": 2, "Abril": 3, "Mayo": 4, "Junio": 5,
                 "Julio": 6, "Agosto": 7, "Septiembre": 8, "Octubre": 9, "Noviembre": 10, "Diciembre": 11
@@ -1071,27 +1099,30 @@
                 const monthIdx = monthsMap[monthName];
                 let dFrom, dTo;
                 if (isFirstHalf) {
-                    dFrom = new Date(currentYear, monthIdx, 1);
-                    dTo = new Date(currentYear, monthIdx, 15);
+                    dFrom = new Date(year, monthIdx, 1);
+                    dTo = new Date(year, monthIdx, 15);
                 } else {
-                    dFrom = new Date(currentYear, monthIdx, 16);
-                    dTo = new Date(currentYear, monthIdx + 1, 0); // Last day of month
+                    dFrom = new Date(year, monthIdx, 16);
+                    dTo = new Date(year, monthIdx + 1, 0); // Last day of month
                 }
 
                 const factor = (n) => String(n).padStart(2, '0');
-                dateFromInput.value = `${currentYear}-${factor(monthIdx + 1)}-${factor(dFrom.getDate())}`;
-                dateToInput.value = `${currentYear}-${factor(monthIdx + 1)}-${factor(dTo.getDate())}`;
+                dateFromInput.value = `${year}-${factor(monthIdx + 1)}-${factor(dFrom.getDate())}`;
+                dateToInput.value = `${year}-${factor(monthIdx + 1)}-${factor(dTo.getDate())}`;
 
                 // Trigger validation for payment date after period update
                 validatePaymentDate();
             }
-        });
+        };
+
+        periodSelect.addEventListener('change', updatePeriodDates);
+        yearSelect.addEventListener('change', updatePeriodDates);
 
         // Validaciones en Tiempo Real
         function validateSalary() {
             const val = parseFloat(salaryInput.value) || 0;
             if (val < 130) {
-                showInlineError(salaryInput, 'El salario mensual no puede ser menor a 130 bs.');
+                showInlineError(salaryInput, 'El salario base no puede ser menor a 130 bs.');
                 return false;
             } else {
                 clearInlineError(salaryInput);
@@ -1113,6 +1144,43 @@
                 return false;
             } else {
                 clearInlineError(paymentDateInput);
+                return true;
+            }
+        }
+
+        function validateWorkerHireDate() {
+            const workerId = document.getElementById('p-worker').value;
+            const period = document.getElementById('p-periodo').value;
+            const workerSelect = document.getElementById('p-worker');
+
+            if (!workerId || !period) {
+                clearInlineError(workerSelect);
+                return true;
+            }
+
+            const w = workers.find(x => String(x.Id_Trabajador) === String(workerId));
+            if (!w || !w.Fecha_de_Ingreso) {
+                clearInlineError(workerSelect);
+                return true;
+            }
+
+            const dates = getPeriodDates(period);
+            if (!dates.end) {
+                clearInlineError(workerSelect);
+                return true;
+            }
+
+            const hireParts = w.Fecha_de_Ingreso.split('-');
+            const hireDate = new Date(hireParts[0], hireParts[1] - 1, hireParts[2]);
+
+            const periodEndParts = dates.end.split('-');
+            const periodEnd = new Date(periodEndParts[0], periodEndParts[1] - 1, periodEndParts[2]);
+
+            if (hireDate > periodEnd) {
+                showInlineError(workerSelect, `El trabajador ingresó el ${w.Fecha_de_Ingreso}. No se puede pagar un período que terminó antes de su fecha de ingreso.`);
+                return false;
+            } else {
+                clearInlineError(workerSelect);
                 return true;
             }
         }
@@ -1175,7 +1243,7 @@
         // Helper: Get dates from period
         function getPeriodDates(period) {
             if (!period || typeof period !== 'string') return { start: '', end: '' };
-            const year = new Date().getFullYear();
+            const year = parseInt(yearSelect.value) || new Date().getFullYear();
             const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
             for (let i = 0; i < 12; i++) {
@@ -1196,6 +1264,11 @@
             const workerId = document.getElementById('p-worker').value;
             const period = document.getElementById('p-periodo').value;
             if (!workerId || !period) return;
+
+            // Validate worker hire date before proceeding
+            if (!validateWorkerHireDate()) {
+                return;
+            }
 
             const w = workers.find(x => String(x.Id_Trabajador) === String(workerId));
             if (!w) return;
@@ -1248,9 +1321,13 @@
             addedConcepts.length = 0; // Limpiar lista al cambiar trabajador
             const w = workers.find(x => String(x.Id_Trabajador) === String(e.target.value));
             if (w) salaryInput.value = w.Sueldo_Mensual || 130;
+            validateWorkerHireDate();
             triggerMandatoryConcepts();
         });
-        document.getElementById('p-periodo').addEventListener('change', triggerMandatoryConcepts);
+        document.getElementById('p-periodo').addEventListener('change', () => {
+            validateWorkerHireDate();
+            triggerMandatoryConcepts();
+        });
 
         addBtn.addEventListener('click', () => {
             const cid = conceptSelect.value;
@@ -1290,6 +1367,11 @@
                 return showError('La fecha de pago debe ser futura al periodo a pagar');
             }
 
+            // Validación: Fecha de ingreso del trabajador
+            if (!validateWorkerHireDate()) {
+                return showError('No se puede procesar el pago porque la fecha de ingreso del trabajador es posterior al período seleccionado');
+            }
+
             // Calcular neto final (Asignaciones - Deducciones) con lógica de dos pasos
             let asig = 0, dedu = 0;
             addedConcepts.forEach(c => {
@@ -1319,7 +1401,7 @@
                     trabajador: w.Nombre_Completo + ' ' + w.Apellidos,
                     cedula: w.Documento_Identidad,
                     fechaPago: fecha,
-                    periodo: periodo,
+                    periodo: `${periodo} ${yearSelect.value}`,
                     fechaInicio: dates.start,
                     fechaFin: dates.end,
                     salarioBase: salario,
@@ -1559,7 +1641,7 @@
             <table class="data-table" style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr style="background-color: var(--primary); color: white;">
-                        <th style="padding: 12px; border: 1px solid var(--border-color);">Frecuencia</th>
+                        <th style="padding: 12px; border: 1px solid var(--border-color);">Nombre / Frecuencia</th>
                         <th style="padding: 12px; border: 1px solid var(--border-color);">Estado</th>
                         <th style="padding: 12px; border: 1px solid var(--border-color);">Acciones</th>
                     </tr>
@@ -1575,10 +1657,11 @@
                                 </span>
                             </td>
                             <td style="padding: 10px; border: 1px solid var(--border-color);">
-                                <button class="btn-edit-nomina primary small" data-id="${t.Id_TipoNomina}">Editar</button>
-                                <button class="btn-toggle-nomina secondary small" data-id="${t.Id_TipoNomina}" data-status="${t.Estado}">
+                                <button class="btn-edit-nomina primary small" data-id="${t.Id_Tipo_Nomina}">Editar</button>
+                                <button class="btn-toggle-nomina secondary small" data-id="${t.Id_Tipo_Nomina}" data-status="${t.Estado}">
                                     ${t.Estado === 'Activo' ? 'Desactivar' : 'Activar'}
                                 </button>
+                                <button class="btn-delete-nomina" data-id="${t.Id_Tipo_Nomina}" style="background-color: var(--error-color); color: white; padding: 6px 10px; border-radius: 8px; margin-left: 5px; cursor: pointer; border:none;" title="Eliminar permanentemente">🗑️</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -1592,7 +1675,7 @@
         contentDetails.innerHTML = '<div class="loader">Cargando tipos de nómina...</div>';
         try {
             const data = await apiFetch('/types-nomina');
-            const tipos = data.tipos || [];
+            let tipos = data.tipos || [];
 
             contentDetails.innerHTML = `
                 <div class="tipos-nomina">
@@ -1611,8 +1694,23 @@
                             <h5 id="tn-form-title" style="margin-top:0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom:10px; margin-bottom:20px;">Detalle de Nómina</h5>
                             <form id="tn-form">
                                 <input type="hidden" id="tn-id">
-                                <label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Frecuencia de Pago (Ej: Quincenal)</label>
-                                <input type="text" id="tn-freq" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                                
+                                <div style="margin-bottom:15px;">
+                                    <label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Tipo / Frecuencia</label>
+                                    <select id="tn-freq-select" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                                        <option value="Semanal">Semanal</option>
+                                        <option value="Quincenal" selected>Quincenal</option>
+                                        <option value="Mensual">Mensual</option>
+                                        <option value="Mixta">Mixta</option>
+                                        <option value="Bonificación">Bonificación</option>
+                                    </select>
+                                </div>
+
+                                <div id="tn-bono-name-container" style="display:none; margin-bottom:15px;">
+                                    <label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Nombre de la Bonificación</label>
+                                    <input type="text" id="tn-bono-name" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);" placeholder="Ej: Bono de Productividad">
+                                </div>
+
                                 <div style="margin-top:20px; display:flex; gap:10px; justify-content: flex-end;">
                                     <button type="button" id="cancel-tn-btn" class="secondary">Cancelar</button>
                                     <button type="submit" class="primary">Guardar</button>
@@ -1634,16 +1732,43 @@
                 form.reset();
                 document.getElementById('tn-id').value = '';
                 document.getElementById('tn-form-title').innerText = 'Registrar Nuevo Tipo de Nómina';
+                document.getElementById('tn-bono-name-container').style.display = 'none';
             });
 
             document.getElementById('cancel-tn-btn').addEventListener('click', () => { formContainer.style.display = 'none'; });
 
+            const freqSelect = document.getElementById('tn-freq-select');
+            const bonoContainer = document.getElementById('tn-bono-name-container');
+            const bonoInput = document.getElementById('tn-bono-name');
+
+            freqSelect.addEventListener('change', () => {
+                bonoContainer.style.display = freqSelect.value === 'Bonificación' ? 'block' : 'none';
+                if (freqSelect.value !== 'Bonificación') bonoInput.value = '';
+            });
+
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const id = document.getElementById('tn-id').value;
+                let frecuencia = freqSelect.value;
+
+                if (frecuencia === 'Bonificación') {
+                    frecuencia = bonoInput.value.trim();
+                    if (!frecuencia) return showError('Debe indicar el nombre de la bonificación');
+                }
+
+                // Restricción: No permitir crear dos tipos de nómina con el mismo nombre
+                const isDuplicate = tipos.some(t => t.Frecuencia.toLowerCase() === frecuencia.toLowerCase() && String(t.Id_Tipo_Nomina) !== String(id));
+                if (isDuplicate) {
+                    return showError('Ya existe un tipo de nómina con ese nombre.');
+                }
+
+                const payload = {
+                    Frecuencia: frecuencia
+                };
+
                 try {
                     const endpoint = id ? `/types-nomina/${id}` : '/types-nomina';
-                    await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ Frecuencia: document.getElementById('tn-freq').value }) });
+                    await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) });
                     showSuccess(id ? 'Tipo de nómina actualizado' : 'Tipo de nómina registrado');
                     renderTipoNominaModule();
                 } catch (e) { showError(e.message); }
@@ -1652,10 +1777,18 @@
             document.querySelectorAll('.btn-edit-nomina').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const id = btn.dataset.id;
-                    const t = tipos.find(x => String(x.Id_TipoNomina) === String(id));
+                    const t = tipos.find(x => String(x.Id_Tipo_Nomina) === String(id));
                     if (t) {
-                        document.getElementById('tn-id').value = t.Id_TipoNomina;
-                        document.getElementById('tn-freq').value = t.Frecuencia;
+                        document.getElementById('tn-id').value = t.Id_Tipo_Nomina;
+                        const standard = ["Semanal", "Quincenal", "Mensual", "Mixta"];
+                        if (standard.includes(t.Frecuencia)) {
+                            document.getElementById('tn-freq-select').value = t.Frecuencia;
+                            document.getElementById('tn-bono-name-container').style.display = 'none';
+                        } else {
+                            document.getElementById('tn-freq-select').value = 'Bonificación';
+                            document.getElementById('tn-bono-name').value = t.Frecuencia;
+                            document.getElementById('tn-bono-name-container').style.display = 'block';
+                        }
                         document.getElementById('tn-form-title').innerText = 'Editar Tipo de Nómina';
                         formContainer.style.display = 'block';
                         formContainer.scrollIntoView({ behavior: 'smooth' });
@@ -1675,6 +1808,20 @@
                     try {
                         await apiFetch(`/types-nomina/${id}/toggle`, { method: 'POST' });
                         showSuccess(`Tipo de nómina ${action}ado correctamente`);
+                        renderTipoNominaModule();
+                    } catch (e) { showError(e.message); }
+                });
+            });
+
+            document.querySelectorAll('.btn-delete-nomina').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const confirmed = await showConfirm(`¿Está seguro de ELIMINAR PERMANENTEMENTE este tipo de nómina?\nEsta acción no se puede deshacer y el registro desaparecerá de la base de datos.`);
+                    if (!confirmed) return;
+
+                    try {
+                        await apiFetch(`/types-nomina/${id}/delete`, { method: 'POST' });
+                        showSuccess(`Registro eliminado de la base de datos`);
                         renderTipoNominaModule();
                     } catch (e) { showError(e.message); }
                 });
@@ -1721,6 +1868,7 @@
     // --- Módulo: Gestión de Cargos ---
     async function renderCargosModule() {
         contentDetails.innerHTML = '<div class="loader">Cargando cargos...</div>';
+
         try {
             const data = await apiFetch('/cargos');
             const cargos = data.cargos || [];
@@ -1739,12 +1887,18 @@
                         </div>
                         
                         <div id="cargo-form-container" style="display:none; background: var(--card-bg); padding:25px; border-radius:12px; margin-top:25px; border:1px solid var(--border-color); box-shadow:0 8px 30px rgba(0,0,0,0.1);">
-                            <h5 id="cargo-form-title" style="margin-top:0; color:var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom:10px; margin-bottom:20px;">Configurar Cargo</h5>
+                            <h5 id="cargo-form-title" style="margin-top:0; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom:10px; margin-bottom:20px;">Configurar Cargo</h5>
                             <form id="cargo-form">
                                 <input type="hidden" id="car-id">
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-                                    <div><label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Nombre del Cargo</label><input type="text" id="car-nombre" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);"></div>
-                                    <div><label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Área Administrativa</label><input type="text" id="car-area" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);"></div>
+                                    <div>
+                                        <label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Nombre del Cargo</label>
+                                        <input type="text" id="car-nombre" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-weight:600; margin-bottom:6px; color: var(--text-main);">Área Administrativa</label>
+                                        <input type="text" id="car-area" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                                    </div>
                                 </div>
                                 <div style="margin-top:20px; display:flex; gap:10px; justify-content: flex-end;">
                                     <button type="button" id="cancel-cargo-btn" class="secondary">Cancelar</button>
@@ -1756,10 +1910,18 @@
                 </div>
             `;
 
-            const addBtn = document.getElementById('add-cargo-btn');
-            const formContainer = document.getElementById('cargo-form-container');
-            const form = document.getElementById('cargo-form');
+            setupCargoListeners(cargos);
+        } catch (e) { 
+            contentDetails.innerHTML = `<div class="error">Error: ${e.message}</div>`; 
+        }
+    }
 
+    function setupCargoListeners(cargos) {
+        const addBtn = document.getElementById('add-cargo-btn');
+        const formContainer = document.getElementById('cargo-form-container');
+        const form = document.getElementById('cargo-form');
+
+        if (addBtn) {
             addBtn.addEventListener('click', () => {
                 const isVisible = formContainer.style.display === 'block';
                 formContainer.style.display = isVisible ? 'none' : 'block';
@@ -1768,9 +1930,14 @@
                 document.getElementById('car-id').value = '';
                 document.getElementById('cargo-form-title').innerText = 'Registrar Nuevo Cargo';
             });
+        }
 
-            document.getElementById('cancel-cargo-btn').addEventListener('click', () => { formContainer.style.display = 'none'; });
+        const cancelBtn = document.getElementById('cancel-cargo-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => { formContainer.style.display = 'none'; });
+        }
 
+        if (form) {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const id = document.getElementById('car-id').value;
@@ -1785,39 +1952,39 @@
                     renderCargosModule();
                 } catch (e) { showError(e.message); }
             });
+        }
 
-            document.querySelectorAll('.btn-edit-cargo').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const id = btn.dataset.id;
-                    const c = cargos.find(x => String(x.Id_Cargo) === String(id));
-                    if (c) {
-                        document.getElementById('car-id').value = c.Id_Cargo;
-                        document.getElementById('car-nombre').value = c.Nombre_profesión;
-                        document.getElementById('car-area').value = c.Area || '';
-                        document.getElementById('cargo-form-title').innerText = 'Editar Cargo';
-                        formContainer.style.display = 'block';
-                        formContainer.scrollIntoView({ behavior: 'smooth' });
-                    }
-                });
+        document.querySelectorAll('.btn-edit-cargo').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const c = cargos.find(x => String(x.Id_Cargo) === String(id));
+                if (c) {
+                    document.getElementById('car-id').value = c.Id_Cargo;
+                    document.getElementById('car-nombre').value = c.Nombre_profesión;
+                    document.getElementById('car-area').value = c.Area || '';
+                    document.getElementById('cargo-form-title').innerText = 'Editar Cargo';
+                    formContainer.style.display = 'block';
+                    formContainer.scrollIntoView({ behavior: 'smooth' });
+                }
             });
+        });
 
-            document.querySelectorAll('.btn-toggle-cargo').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const id = btn.dataset.id;
-                    const status = btn.dataset.status;
-                    const action = status === 'Activo' ? 'desactivar' : 'activar';
+        document.querySelectorAll('.btn-toggle-cargo').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const status = btn.dataset.status;
+                const action = status === 'Activo' ? 'desactivar' : 'activar';
 
-                    const confirmed = await showConfirm(`¿Desea ${action} este cargo?`);
-                    if (!confirmed) return;
+                const confirmed = await showConfirm(`¿Desea ${action} este cargo?`);
+                if (!confirmed) return;
 
-                    try {
-                        await apiFetch(`/cargos/${id}/toggle`, { method: 'POST' });
-                        showSuccess(`Cargo ${action}ado correctamente`);
-                        renderCargosModule();
-                    } catch (e) { showError(e.message); }
-                });
+                try {
+                    await apiFetch(`/cargos/${id}/toggle`, { method: 'POST' });
+                    showSuccess(`Cargo ${action}ado correctamente`);
+                    renderCargosModule();
+                } catch (e) { showError(e.message); }
             });
-        } catch (e) { contentDetails.innerHTML = `<div class="error">Error: ${e.message}</div>`; }
+        });
     }
 
     // Exponer globalmente

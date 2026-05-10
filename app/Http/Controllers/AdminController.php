@@ -28,6 +28,8 @@ class AdminController extends Controller
                 'w.*',
                 'c.Nombre_profesión as Cargo',
                 'n.Nombre_Nivel as Nivel_Educativo',
+                'ct.Id_Tipo_Nomina as Id_Tipo_Nomina',
+                'ct.Observaciones as Observaciones',
                 'tn.Frecuencia',
                 'ct.Estado as Contrato_Estado'
             )
@@ -231,10 +233,14 @@ class AdminController extends Controller
     public function storeTypeNomina(Request $request)
     {
         $data = $request->validate([
-            'Frecuencia' => 'required|string',
-            'Fecha_Inicio' => 'nullable|date',
-            'Fecha_Fin' => 'nullable|date'
+            'Frecuencia' => 'required|string|unique:tipo_nomina,Frecuencia'
+        ], [
+            'Frecuencia.unique' => 'Ya existe un tipo de nómina con este nombre.'
         ]);
+
+        // Proveer valores por defecto para campos obligatorios en DB tras eliminar vigencia en UI
+        $data['Fecha_Inicio'] = '1900-01-01';
+        $data['Fecha_Fin'] = '2099-12-31';
 
         $tipo = TipoNomina::create($data);
         return response()->json(['success' => true, 'id' => $tipo->Id_Tipo_Nomina]);
@@ -244,9 +250,9 @@ class AdminController extends Controller
     {
         $tipo = TipoNomina::findOrFail($id);
         $data = $request->validate([
-            'Frecuencia' => 'required|string',
-            'Fecha_Inicio' => 'nullable|date',
-            'Fecha_Fin' => 'nullable|date'
+            'Frecuencia' => 'required|string|unique:tipo_nomina,Frecuencia,' . $id . ',Id_Tipo_Nomina'
+        ], [
+            'Frecuencia.unique' => 'Ya existe un tipo de nómina con este nombre.'
         ]);
         $tipo->update($data);
         return response()->json(['success' => true]);
@@ -258,6 +264,13 @@ class AdminController extends Controller
         $tipo->Estado = ($tipo->Estado === 'Activo') ? 'Inactivo' : 'Activo';
         $tipo->save();
         return response()->json(['success' => true, 'new_status' => $tipo->Estado]);
+    }
+
+    public function deleteTypeNomina($id)
+    {
+        $tipo = TipoNomina::findOrFail($id);
+        $tipo->delete();
+        return response()->json(['success' => true]);
     }
 
     public function listConcepts()
@@ -334,7 +347,6 @@ class AdminController extends Controller
 
     public function listCargos()
     {
-        // En legacy es 'Nombre_profesión' y 'Area'
         return response()->json(['cargos' => Cargo::all()]);
     }
 
@@ -348,7 +360,6 @@ class AdminController extends Controller
         $cargo = Cargo::create($data);
         return response()->json(['success' => true, 'id' => $cargo->Id_Cargo]);
     }
-
     public function updateCargo(Request $request, $id)
     {
         $cargo = Cargo::findOrFail($id);
