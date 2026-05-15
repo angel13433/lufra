@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -11,20 +10,25 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
+    // --- CONFIGURACIÓN DE BASE DE DATOS PERSONALIZADA ---
+    protected $table = 'usuario'; 
+    protected $primaryKey = 'Id_Usuario'; 
+
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * DESACTIVAR TIMESTAMPS
+     * Se desactiva porque la tabla 'usuario' no tiene las columnas 
+     * created_at y updated_at, lo que causaba el error SQL 1054.
      */
+    public $timestamps = false; 
+    // ----------------------------------------------------
+
     protected $fillable = [
-        'name',
-        'email',
-        'username',
-        'password',
-        'role',
+        'Nombre_usuario', 
+        'Correo',         
+        'Contraseña',     
+        'Id_rol',
         'Id_Trabajador',
         'Estado',
     ];
@@ -34,34 +38,36 @@ class User extends Authenticatable
         return $this->belongsTo(Trabajador::class, 'Id_Trabajador', 'Id_Trabajador');
     }
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
-        'password',
+        'Contraseña',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'Contraseña' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
+    public function getAuthPassword()
+    {
+        return $this->Contraseña;
+    }
+
     public function roleModel()
     {
-        return $this->belongsTo(Role::class, 'role', 'Nombre_rol');
+        return $this->belongsTo(Role::class, 'Id_rol', 'Id_rol');
+    }
+
+    /**
+     * RELACIÓN DEL MÓDULO DE SEGURIDAD
+     */
+    public function respuestasSeguridad()
+    {
+        return $this->hasMany(RespuestaSeguridadUsuario::class, 'user_id', 'Id_Usuario');
     }
 }

@@ -1,30 +1,141 @@
-// ScriptLogin.js limpio para login Laravel
 (function () {
-    // Elementos del DOM
+    // Elementos del DOM (Login)
     const loginForm = document.getElementById('loginForm');
     const username = document.getElementById('username');
     const password = document.getElementById('password');
     const message = document.getElementById('message');
 
-    // SVG para mostrar/ocultar contraseña
-    const eyeSvg = `
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M1.5 12s4-7 10.5-7S22.5 12 22.5 12s-4 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>`;
-    const eyeOffSvg = `
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M10.47 10.47A3 3 0 0113.53 13.53" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2.21 12.7C3.67 15.55 7.17 18 12 18c6.5 0 10.5-6 10.5-6s-1.99-2.55-4.58-4.19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>`;
+    // Elementos del DOM (Módulo de Seguridad)
+    const recoverySection = document.getElementById('recoverySection');
+    const showRecoveryBtn = document.getElementById('show-recovery');
+    const cancelRecoveryBtn = document.getElementById('btn-cancel-recovery');
+    const btnRecoveryMain = document.getElementById('btn-recovery-main');
+    const recoveryEmailInput = document.getElementById('recovery-email');
+    const stepQuestionDiv = document.getElementById('step-question');
+    const displayQuestionLabel = document.getElementById('display-question');
+    const recoveryAnswerInput = document.getElementById('recovery-answer');
 
-    // Mostrar/ocultar contraseña
+    let recoveryStep = 1; // 1: Verificar Email, 2: Verificar Respuesta
+
+    // SVGs originales para contraseña
+    const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1.5 12s4-7 10.5-7S22.5 12 22.5 12s-4 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const eyeOffSvg = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.47 10.47A3 3 0 0113.53 13.53" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.21 12.7C3.67 15.55 7.17 18 12 18c6.5 0 10.5-6 10.5-6s-1.99-2.55-4.58-4.19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+    // --- LÓGICA DE INTERCAMBIO DE FORMULARIOS ---
+
+    if (showRecoveryBtn) {
+        showRecoveryBtn.addEventListener('click', () => {
+            loginForm.style.display = 'none';
+            recoverySection.style.display = 'block';
+            message.classList.remove('show');
+        });
+    }
+
+    if (cancelRecoveryBtn) {
+        cancelRecoveryBtn.addEventListener('click', () => {
+            loginForm.style.display = 'block';
+            recoverySection.style.display = 'none';
+            resetRecovery();
+        });
+    }
+
+    function resetRecovery() {
+        recoveryStep = 1;
+        stepQuestionDiv.style.display = 'none';
+        recoveryEmailInput.parentElement.parentElement.style.display = 'block';
+        btnRecoveryMain.querySelector('.btn-text').textContent = 'VERIFICAR CORREO';
+        recoveryEmailInput.value = '';
+        recoveryAnswerInput.value = '';
+        message.classList.remove('show');
+    }
+
+    // --- PROCESO DE RECUPERACIÓN (FETCH) ---
+
+    btnRecoveryMain.addEventListener('click', async () => {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        
+        if (recoveryStep === 1) {
+            const email = recoveryEmailInput.value.trim();
+            if (!email) return alert('Por favor ingresa tu correo.');
+
+            btnRecoveryMain.classList.add('loading');
+            
+            try {
+                const response = await fetch('/seguridad/preguntas-desafio', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+
+                const data = await response.json();
+                btnRecoveryMain.classList.remove('loading');
+
+                if (response.ok) {
+                    recoveryEmailInput.parentElement.parentElement.style.display = 'none';
+                    stepQuestionDiv.style.display = 'block';
+                    displayQuestionLabel.textContent = data.preguntas[0].pregunta;
+                    btnRecoveryMain.querySelector('.btn-text').textContent = 'VALIDAR RESPUESTA';
+                    recoveryStep = 2;
+                } else {
+                    message.textContent = data.message || 'Error al buscar preguntas.';
+                    message.className = 'show error';
+                }
+            } catch (error) {
+                btnRecoveryMain.classList.remove('loading');
+                console.error(error);
+            }
+
+        } else if (recoveryStep === 2) {
+            const answer = recoveryAnswerInput.value.trim();
+            if (!answer) return alert('Debes escribir una respuesta.');
+
+            btnRecoveryMain.classList.add('loading');
+
+            try {
+                const response = await fetch('/seguridad/verificar-respuesta', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({
+                        email: recoveryEmailInput.value.trim(),
+                        pregunta_id: 1, 
+                        respuesta: answer
+                    })
+                });
+
+                const data = await response.json();
+                btnRecoveryMain.classList.remove('loading');
+
+                if (response.ok) {
+                    message.textContent = '¡Identidad verificada! Redirigiendo al cambio de clave...';
+                    message.className = 'show success';
+                    setTimeout(() => {
+                        // REDIRECCIÓN MODIFICADA: Ahora apunta a la nueva ruta en web.php
+                        window.location.href = '/seguridad/restablecer-clave'; 
+                    }, 2000);
+                } else {
+                    message.textContent = data.message || 'Respuesta incorrecta.';
+                    message.className = 'show error';
+                }
+            } catch (error) {
+                btnRecoveryMain.classList.remove('loading');
+                console.error(error);
+            }
+        }
+    });
+
+    // --- TUS FUNCIONES ORIGINALES (MOSTRAR/OCULTAR PASS) ---
+
     const toggleButtons = document.querySelectorAll('.toggle-pass');
     toggleButtons.forEach(btn => {
         btn.innerHTML = eyeSvg;
-        btn.setAttribute('title', 'Mostrar contraseña');
-        btn.setAttribute('aria-label', 'Mostrar contraseña');
         btn.addEventListener('click', () => {
             const row = btn.closest('.input-row');
             if (!row) return;
@@ -33,127 +144,54 @@
             const isPassword = inp.type === 'password';
             inp.type = isPassword ? 'text' : 'password';
             btn.innerHTML = isPassword ? eyeOffSvg : eyeSvg;
-            btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
-            btn.setAttribute('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            btn.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
             inp.focus();
         });
     });
 
-    // Validación de contraseña en tiempo real
-    const pwCriteria = document.getElementById('pwCriteria');
-    if (pwCriteria) {
-        const pwRules = [
-            { test: (pw) => pw.length >= 8, key: 'length' },
-            { test: (pw) => /[a-z]/.test(pw), key: 'lower' },
-            { test: (pw) => /[A-Z]/.test(pw), key: 'upper' },
-            { test: (pw) => /[0-9]/.test(pw), key: 'number' },
-            { test: (pw) => /[^a-zA-Z0-9]/.test(pw), key: 'special' }
-        ];
-        password.addEventListener('input', () => {
-            const pw = password.value;
-            pwRules.forEach(rule => {
-                const li = pwCriteria.querySelector(`[data-rule="${rule.key}"]`);
-                if (li) {
-                    li.classList.toggle('pass', rule.test(pw));
-                    li.classList.toggle('fail', !rule.test(pw));
-                }
-            });
-        });
-    }
+    // --- FORMULARIO DE LOGIN ORIGINAL ---
 
-    // Formulario de login
     if (loginForm) {
         loginForm.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             message.classList.remove('show');
             const u = username.value.trim();
             const p = password.value;
+            
             if (!u || !p) {
-                if (!u) username.setAttribute('aria-invalid', 'true');
-                if (!p) password.setAttribute('aria-invalid', 'true');
-                loginForm.classList.remove('shake');
-                void loginForm.offsetWidth;
                 loginForm.classList.add('shake');
                 message.textContent = 'Por favor completa todos los campos.';
                 message.className = 'show error';
-                if (!u) username.focus();
-                else if (!p) password.focus();
+                setTimeout(() => loginForm.classList.remove('shake'), 500);
                 return;
             }
-            username.removeAttribute('aria-invalid');
-            password.removeAttribute('aria-invalid');
+
             const btn = loginForm.querySelector('.btn');
             btn.classList.add('loading');
-            btn.setAttribute('aria-busy', 'true');
+
             try {
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-                
                 const response = await fetch('login', {
                     method: 'POST',
-                    credentials: 'same-origin',
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': csrfToken
                     },
-                    body: JSON.stringify({
-                        username: u,
-                        password: p
-                    })
+                    body: JSON.stringify({ username: u, password: p })
                 });
-                
+
                 btn.classList.remove('loading');
-                btn.removeAttribute('aria-busy');
+                const data = await response.json();
 
-                const contentType = response.headers.get("content-type");
-                
                 if (!response.ok) {
-                    if (contentType && contentType.includes("application/json")) {
-                        const errorData = await response.json();
-                        message.textContent = errorData.message || 'Error en el login';
-                    } else if (response.status === 419) {
-                        message.textContent = 'La sesión ha expirado. Recarga la página.';
-                    } else {
-                        message.textContent = 'Error de servidor o credenciales (Status: ' + response.status + ')';
-                    }
+                    message.textContent = data.message || 'Credenciales incorrectas.';
                     message.className = 'show error';
-                    return;
-                }
-
-                if (contentType && contentType.includes("application/json")) {
-                    const data = await response.json();
-                    let redirectUrl = '/';
-                    const role = (data.role || '').toLowerCase();
-                    
-                    if (role === 'trabajador') {
-                        redirectUrl = '/trabajador';
-                    } else if (role === 'administrativo') {
-                        redirectUrl = '/administrativo';
-                    } else if (role === 'superusuario') {
-                        redirectUrl = '/superusuario';
-                    }
-                    
-                    message.textContent = 'Inicio de sesión exitoso. Redirigiendo...';
-                    message.className = 'show success';
-                    message.style.backgroundColor='#28a745';
-                    message.style.color='#fff';
-                    
-                    setTimeout(() => {
-                        window.location.href = redirectUrl;
-                    }, 500);
                 } else {
-                    // Si el servidor devolvió HTML (redirect seguido por fetch)
-                    // Probablemente el login ya estaba activo o hubo un redirect intermedio.
-                    // Redirigimos al controlador que sabe a dónde enviar cada rol.
-                    console.warn('Login exitoso pero respuesta no es JSON. Redirigiendo al manejador de roles.');
                     window.location.href = '/redirect-after-login';
                 }
             } catch (error) {
                 btn.classList.remove('loading');
-                btn.removeAttribute('aria-busy');
-                message.textContent = 'Error de conexión o servidor.';
+                message.textContent = 'Error de conexión.';
                 message.className = 'show error';
             }
         });
