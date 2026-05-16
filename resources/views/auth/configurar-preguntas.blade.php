@@ -91,11 +91,22 @@
         text-align: left;
         border-left: 5px solid #1e88e5;
     }
+
+    .alert-success-custom {
+        background-color: #e8f5e9;
+        color: #1b5e20;
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-size: 0.85rem;
+        text-align: left;
+        border-left: 5px solid #4caf50;
+    }
 </style>
 
 <div class="setup-wrapper">
     <div class="setup-card">
-        <h2>Configurar Seguridad</h2>
+        <h2>{{ isset($preguntaActual) ? 'Actualizar Seguridad' : 'Configurar Seguridad' }}</h2>
         <p>Establece tus preguntas de seguridad para poder recuperar tu cuenta de forma autónoma si olvidas tu clave.</p>
 
         @if(session('info'))
@@ -104,25 +115,38 @@
             </div>
         @endif
 
+        @if(session('success'))
+            <div class="alert-success-custom">
+                <i class="fas fa-check-circle"></i> {{ session('success') }}
+            </div>
+        @endif
+
         <form id="setupQuestionsForm" action="{{ route('seguridad.guardar-preguntas') }}" method="POST">
             @csrf
             
             <div class="form-group">
-                <label for="pregunta1">Primera Pregunta de Seguridad</label>
+                <label for="pregunta1">Pregunta de Seguridad</label>
                 <select name="pregunta_id" id="pregunta1" required>
-                    <option value="" disabled selected>Selecciona una pregunta...</option>
+                    <option value="" disabled {{ !isset($preguntaActual) ? 'selected' : '' }}>Selecciona una pregunta...</option>
                     @foreach($preguntas as $pregunta)
-                        <option value="{{ $pregunta->id }}">{{ $pregunta->pregunta }}</option>
+                        <option value="{{ $pregunta->id }}" 
+                            {{ (isset($preguntaActual) && $preguntaActual->pregunta_id == $pregunta->id) ? 'selected' : '' }}>
+                            {{ $pregunta->pregunta }}
+                        </option>
                     @endforeach
                 </select>
             </div>
 
             <div class="form-group">
                 <label for="respuesta1">Tu Respuesta</label>
-                <input type="text" name="respuesta" id="respuesta1" required placeholder="Escribe tu respuesta aquí" autocomplete="off">
+                <input type="text" name="respuesta" id="respuesta1" required 
+                    placeholder="{{ isset($preguntaActual) ? 'Escribe una nueva respuesta para cambiarla' : 'Escribe tu respuesta aquí' }}" 
+                    autocomplete="off">
             </div>
 
-            <button type="submit" class="btn-save">GUARDAR CONFIGURACIÓN</button>
+            <button type="submit" class="btn-save">
+                {{ isset($preguntaActual) ? 'ACTUALIZAR CONFIGURACIÓN' : 'GUARDAR CONFIGURACIÓN' }}
+            </button>
         </form>
     </div>
 </div>

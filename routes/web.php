@@ -19,18 +19,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Redirección inteligente según el rol después de loguearse
     Route::get('/redirect-after-login', \App\Http\Controllers\RedirectAfterLoginController::class)->name('redirect.after.login');
     
-    // VISTA: Formulario para que el usuario registre sus preguntas secretas
+    // VISTA: Formulario para que el usuario registre o edite sus preguntas secretas
     Route::get('/seguridad/configurar-preguntas', [SeguridadController::class, 'mostrarConfigurarPreguntas'])->name('seguridad.configurar.vista');
     
-    // PROCESO: Guarda la pregunta elegida en la base de datos
+    // PROCESO: Guarda la pregunta elegida en la base de datos (Autogestión)
     Route::post('/seguridad/guardar-preguntas', [SeguridadController::class, 'guardarPreguntas'])->name('seguridad.guardar-preguntas');
+
+    /**
+     * ACCIONES EXCLUSIVAS DEL SUPERUSUARIO (ADMINISTRACIÓN DE SEGURIDAD)
+     */
+    Route::prefix('admin/seguridad')->group(function () {
+        // Forzar cambio de contraseña de un trabajador
+        Route::post('/reset-password/{id}', [SeguridadController::class, 'adminResetearPassword'])->name('admin.seguridad.reset');
+        
+        // Limpiar preguntas de seguridad de un trabajador
+        Route::delete('/clear-questions/{id}', [SeguridadController::class, 'adminEliminarPregunta'])->name('admin.seguridad.clear');
+    });
 });
 
 /**
  * RUTAS DEL MÓDULO DE SEGURIDAD (RECUPERACIÓN PÚBLICA POR PREGUNTAS)
  */
 Route::prefix('seguridad')->group(function () {
-    // 1. Obtener preguntas tras ingresar el correo
+    // 1. Obtener preguntas tras ingresar el nombre de usuario
     Route::post('/preguntas-desafio', [SeguridadController::class, 'obtenerPreguntas'])->name('seguridad.preguntas');
     
     // 2. Validar la respuesta escrita por el usuario

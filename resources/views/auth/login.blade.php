@@ -4,6 +4,34 @@
 
 @section('content')
 
+<style>
+    /* SOLUCIÓN AL ERROR EN ROJO: Visible, ordenado y con auto-ajuste de texto */
+    .msg-box-custom {
+        margin-top: 15px;
+        margin-bottom: 10px;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        text-align: center;
+        width: 100%;
+        box-sizing: border-box;
+        word-wrap: break-word; /* Evita que los textos largos se corten por los lados */
+        display: none; /* Se activa dinámicamente por JS */
+    }
+
+    .msg-error-custom {
+        background-color: rgba(239, 68, 68, 0.15) !important;
+        color: #ef4444 !important;
+        border: 1px solid rgba(239, 68, 68, 0.4) !important;
+    }
+
+    .msg-success-custom {
+        background-color: rgba(16, 185, 129, 0.15) !important;
+        color: #10b981 !important;
+        border: 1px solid rgba(16, 185, 129, 0.4) !important;
+    }
+</style>
+
 <button id="theme-toggle" class="theme-btn" aria-label="Cambiar tema">
     <svg id="moon-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
     <svg id="sun-icon" viewBox="0 0 24 24" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
@@ -59,6 +87,8 @@
                     <a href="javascript:void(0)" id="show-recovery" class="forgot-link">Recuperar contraseña</a>
                 </div>
 
+                <div id="login-message" class="msg-box-custom" role="status" aria-live="polite"></div>
+
                 <div class="actions">
                     <button class="btn primary" type="submit">
                         <span class="btn-text">INICIAR SESIÓN</span>
@@ -71,23 +101,25 @@
                 <h2 style="color: var(--text-color); margin-bottom: 10px; font-size: 1.5em;">Recuperar Acceso</h2>
                 <p style="color: var(--text-color); opacity: 0.8; margin-bottom: 20px; font-size: 0.9em;">Sigue los pasos para verificar tu identidad.</p>
 
-                <div id="step-email" class="field">
-                    <label for="recovery-email">Correo electrónico</label>
+                <div id="step-username-container" class="field">
+                    <label for="recovery-username">Nombre de usuario</label>
                     <div class="input-row">
-                        <input type="email" id="recovery-email" placeholder="Introduce tu correo registrado">
+                        <input type="text" id="recovery-username" placeholder="Ej: Kelvis_1" autocomplete="off">
                     </div>
                 </div>
 
                 <div id="step-question" class="field" style="display: none; margin-top: 20px;">
                     <label id="display-question" style="font-weight: bold; color: var(--primary-color); display: block; margin-bottom: 10px;"></label>
                     <div class="input-row">
-                        <input type="text" id="recovery-answer" placeholder="Tu respuesta">
+                        <input type="text" id="recovery-answer" placeholder="Tu respuesta" autocomplete="off">
                     </div>
                 </div>
 
-                <div class="actions" style="margin-top: 25px;">
+                <div id="recovery-message" class="msg-box-custom" role="status" aria-live="polite"></div>
+
+                <div class="actions" style="margin-top: 15px;">
                     <button id="btn-recovery-main" class="btn primary" type="button">
-                        <span class="btn-text">VERIFICAR CORREO</span>
+                        <span class="btn-text">VERIFICAR USUARIO</span>
                     </button>
                     <button id="btn-cancel-recovery" class="btn" type="button" style="background: transparent; color: var(--text-color); margin-top: 10px; border: 1px solid rgba(255,255,255,0.1);">
                         CANCELAR
@@ -95,7 +127,6 @@
                 </div>
             </div>
 
-            <div id="message" role="status" aria-live="polite"></div>
         </div>
     </div>
 </main>
@@ -104,7 +135,6 @@
 <script src="{{ asset('js/ScriptLogin.js') }}" defer></script>
 
 <script>
-    // Tu lógica de cambio de tema se mantiene intacta aquí abajo...
     document.addEventListener('DOMContentLoaded', () => {
         const themeBtn = document.getElementById('theme-toggle');
         const moonIcon = document.getElementById('moon-icon');
