@@ -9,9 +9,60 @@ use App\Models\PreguntaSeguridad;
 use App\Models\RespuestaSeguridadUsuario;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SeguridadController extends Controller
 {
+    /**
+     * VISTA: Mostrar el formulario para registrar las preguntas de seguridad.
+     */
+    public function mostrarConfigurarPreguntas()
+    {
+        // Obtenemos todas las preguntas maestras de la tabla 'preguntas_seguridad'
+        $preguntas = DB::table('preguntas_seguridad')->get();
+
+        return view('auth.configurar-preguntas', compact('preguntas'));
+    }
+
+    /**
+     * PROCESO: Guardar o actualizar la pregunta de seguridad del usuario en la base de datos.
+     */
+    public function guardarPreguntas(Request $request)
+    {
+        $request->validate([
+            'pregunta_id' => 'required|exists:preguntas_seguridad,id',
+            'respuesta' => 'required|string|max:255',
+        ]);
+
+        $usuario = Auth::user();
+
+        if (!$usuario) {
+            return redirect()->route('login');
+        }
+
+        // Limpiamos y encriptamos la respuesta ya que el validador usa Hash::check
+        $respuestaTexto = strtolower(trim($request->respuesta));
+        $respuestaHash = Hash::make($respuestaTexto);
+
+        // Actualizamos o insertamos el registro vinculándolo con 'Id_Usuario'
+        DB::table('respuestas_seguridad_usuario')->updateOrInsert(
+            [
+                'user_id' => $usuario->Id_Usuario,
+                'pregunta_id' => $request->pregunta_id
+            ],
+            [
+                'respuesta_hash' => $respuestaHash,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]
+        );
+
+        // Redirigimos al flujo normal para que pase por el filtro de roles
+        return redirect()->route('redirect.after.login')
+                         ->with('success', '¡Pregunta de seguridad establecida con éxito!');
+    }
+
     /**
      * Paso 1: Buscar al usuario por correo y devolver sus preguntas.
      */
@@ -56,7 +107,6 @@ class SeguridadController extends Controller
 
         $usuario = User::where('Correo', $request->email)->first();
 
-        // Usamos Id_Usuario con las mayúsculas correctas de tu SQL
         $respuestaGuardada = RespuestaSeguridadUsuario::where('user_id', $usuario->Id_Usuario)
             ->where('pregunta_id', $request->pregunta_id)
             ->first();
@@ -66,7 +116,6 @@ class SeguridadController extends Controller
         }
 
         if (Hash::check(strtolower(trim($request->respuesta)), $respuestaGuardada->respuesta_hash)) {
-            // Aseguramos el guardado del email en la sesión
             Session::put('reset_email', $request->email);
             return response()->json(['message' => 'Respuesta correcta. Puede proceder.']);
         }
@@ -83,7 +132,6 @@ class SeguridadController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        // Recuperamos el correo de la sesión
         $email = Session::get('reset_email');
 
         if (!$email) {
@@ -93,11 +141,9 @@ class SeguridadController extends Controller
         $usuario = User::where('Correo', $email)->first();
 
         if ($usuario) {
-            // CORRECCIÓN: En tu tabla 'usuario', la columna es 'Contraseña'
             $usuario->Contraseña = Hash::make($request->password);
             $usuario->save();
 
-            // Limpiamos la sesión de seguridad
             Session::forget('reset_email');
 
             return response()->json(['message' => '¡Éxito! Tu contraseña ha sido actualizada.']);

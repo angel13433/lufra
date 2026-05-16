@@ -12,13 +12,22 @@ Route::get('/login', function () {
     return view('auth.login');
 })->middleware('guest')->name('login');
 
+/**
+ * RUTAS PROTEGIDAS POR AUTENTICACIÓN
+ */
 Route::middleware(['auth', 'verified'])->group(function () {
-    // CORREGIDO: Eliminado el doble \App\App\
+    // Redirección inteligente según el rol después de loguearse
     Route::get('/redirect-after-login', \App\Http\Controllers\RedirectAfterLoginController::class)->name('redirect.after.login');
+    
+    // VISTA: Formulario para que el usuario registre sus preguntas secretas
+    Route::get('/seguridad/configurar-preguntas', [SeguridadController::class, 'mostrarConfigurarPreguntas'])->name('seguridad.configurar.vista');
+    
+    // PROCESO: Guarda la pregunta elegida en la base de datos
+    Route::post('/seguridad/guardar-preguntas', [SeguridadController::class, 'guardarPreguntas'])->name('seguridad.guardar-preguntas');
 });
 
 /**
- * RUTAS DEL MÓDULO DE SEGURIDAD (RECUPERACIÓN POR PREGUNTAS)
+ * RUTAS DEL MÓDULO DE SEGURIDAD (RECUPERACIÓN PÚBLICA POR PREGUNTAS)
  */
 Route::prefix('seguridad')->group(function () {
     // 1. Obtener preguntas tras ingresar el correo
