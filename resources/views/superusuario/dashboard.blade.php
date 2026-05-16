@@ -8,7 +8,6 @@
     <title>Panel de Superusuario - Sistema de Nóminas</title>
 
     <link rel="stylesheet" href="{{ asset('css/Sistema.css') }}">
-    <!-- Modern Font: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -81,6 +80,32 @@
             color: white;
             border-color: var(--danger);
             box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        /* ESTILO INTERNO: Botón de Seguridad en el Sidebar */
+        #security-btn {
+            background-color: transparent;
+            border: 1px solid rgba(16, 168, 122, 0.6);
+            color: #a7f3d0;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        #security-btn:hover {
+            background-color: #10a87a;
+            color: white;
+            border-color: #10a87a;
+            box-shadow: 0 4px 12px rgba(16, 168, 122, 0.4);
         }
 
         /* Navigation Links */
@@ -205,7 +230,17 @@
         <h3>Sistema de Nóminas</h3>
         <div id="user-info">
             <p id="username-display">{{ auth()->user()->name }}</p>
-            <div id="user-actions-container" style="display: flex; gap: 8px; justify-content: center; align-items: center;">
+            
+            <div id="user-actions-container" style="display: flex; gap: 8px; justify-content: center; align-items: center; width: 100%;">
+                
+                <a href="{{ route('seguridad.configurar.vista') }}" id="security-btn" style="flex: 1;">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    Seguridad
+                </a>
+
                 <form action="{{ route('logout') }}" method="POST" style="margin: 0; flex: 1;">
                     @csrf
                     <button type="submit" id="logout-btn" style="padding: 8px 10px; font-size: 0.85rem;">
