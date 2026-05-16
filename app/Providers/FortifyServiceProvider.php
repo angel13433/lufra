@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth; // <-- Importamos Auth para gestionar las sesiones
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -50,6 +51,12 @@ class FortifyServiceProvider extends ServiceProvider
 
             // Verificamos que el usuario exista y la Contraseña sea correcta
             if ($user && Hash::check($request->password, $user->Contraseña)) {
+                
+                // =========================================================================
+                // BLOQUEO SIMULTÁNEO: Cierra sesiones en otros navegadores/dispositivos
+                // =========================================================================
+                Auth::logoutOtherDevices($request->password);
+                
                 return $user;
             }
 

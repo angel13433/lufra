@@ -13,11 +13,16 @@ class Kernel extends HttpKernel
      */
     protected $middlewareGroups = [
         'web' => [
-            // ...existing code...
             \App\Http\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,
-            // ...existing code...
+            
+            // PASO 2 ACTIVADO: Middleware para rastrear sesiones activas de un mismo usuario
+            \Illuminate\Session\Middleware\AuthenticateSession::class,
+            
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \App\Http\Middleware\VerifyCsrfToken::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
         'api' => [
             'throttle:api',
@@ -31,8 +36,9 @@ class Kernel extends HttpKernel
      * @var array<string, class-string|string>
      */
     protected $routeMiddleware = [
-        // ...existing code...
+        'auth' => \App\Http\Middleware\Authenticate::class,
+        'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'role' => \App\Http\Middleware\RoleMiddleware::class,
-        // ...existing code...
+        // ...puedes mantener aquí abajo el resto de tus middlewares de ruta si tenías más...
     ];
 }
